@@ -33,7 +33,9 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
 
   Future<void> fetchProfile() async {
     final response = await http.post(
-      Uri.parse('http://192.168.218.89/aplikasi-checkin/get_profile_guru.php'),
+      Uri.parse(
+        'http://192.168.242.233/aplikasi-checkin/pages/guru/get_profile_guru.php',
+      ),
       body: {'email': widget.email},
     );
 
@@ -44,7 +46,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
         final result = json.decode(response.body);
         if (result['status'] == 'success') {
           final String baseUrl =
-              'http://192.168.218.89/aplikasi-checkin/uploads/guru/';
+              'http://192.168.242.233/aplikasi-checkin/uploads/guru/';
           setState(() {
             _profileData = result['data'];
             if (_profileData!['foto'] != null && _profileData!['foto'] != '') {

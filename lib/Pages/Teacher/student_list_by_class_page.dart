@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:checkin/Pages/settings_page.dart';
+import 'package:checkin/Pages/Teacher/hidden_student_page.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class StudentListByClassPage extends StatefulWidget {
   final String kelas;
@@ -28,15 +29,12 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
 
   Future<void> loadGuruEmailAndFetchStudents() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      guruEmail = prefs.getString('guru_email');
-    });
+    guruEmail = prefs.getString('guru_email');
+
     if (guruEmail != null) {
       await fetchStudentsByClass(widget.kelas);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Guru email tidak ditemukan")),
-      );
+      _showErrorDialog("Guru email tidak ditemukan");
       setState(() {
         isLoading = false;
       });
@@ -44,10 +42,14 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
   }
 
   Future<void> fetchStudentsByClass(String kelas) async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       final response = await http.get(
         Uri.parse(
-          'http://192.168.218.89/aplikasi-checkin/get_students_by_class.php?kelas=${Uri.encodeComponent(kelas)}&guru_email=${Uri.encodeComponent(guruEmail!)}',
+          'http://192.168.242.233/aplikasi-checkin/pages/guru/get_students_by_class.php?kelas=${Uri.encodeComponent(widget.kelas)}&guru_email=${Uri.encodeComponent(guruEmail!)}',
         ),
       );
 
@@ -55,51 +57,109 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
         final data = json.decode(response.body);
         setState(() {
           students =
-              data['status']
+              (data['status'] == true || data['status'] == 'success')
                   ? List<Map<String, dynamic>>.from(data['data'])
                   : [];
-          isLoading = false;
         });
+        _showSuccessToast("Data siswa berhasil dimuat.");
       } else {
         setState(() {
           students = [];
-          isLoading = false;
         });
+        _showErrorDialog("Gagal memuat data siswa");
       }
     } catch (e) {
+      _showErrorDialog("Gagal memuat data siswa");
       setState(() {
         students = [];
+      });
+    } finally {
+      setState(() {
         isLoading = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Gagal memuat data siswa")));
     }
   }
 
   Future<void> hideStudent(int id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Konfirmasi"),
+            content: const Text("Sembunyikan siswa ini dari daftar?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Batal"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Ya"),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed != true) return;
+
     final response = await http.post(
       Uri.parse(
-        'http://192.168.218.89/aplikasi-checkin/hide_student_for_teacher.php',
+        'http://192.168.242.233/aplikasi-checkin/pages/guru/hide_student_for_teacher.php',
       ),
       body: {'guru_email': guruEmail!, 'siswa_id': id.toString()},
     );
 
     final data = json.decode(response.body);
-    if (data['status']) {
+    if (data['status'] == true || data['status'] == 'success') {
       setState(() {
         students.removeWhere((student) => student["id"] == id);
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Siswa disembunyikan")));
+      _showSuccessToast("Siswa disembunyikan");
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(data['message'] ?? 'Gagal menyembunyikan siswa'),
-        ),
-      );
+      _showErrorDialog(data['message'] ?? 'Gagal menyembunyikan siswa');
     }
+  }
+
+  Future<void> navigateToHiddenStudents() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HiddenStudentPage()),
+    );
+
+    if (result == true) {
+      await fetchStudentsByClass(widget.kelas); // refresh setelah kembali
+    }
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -110,7 +170,7 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(height: 25, child: Container()),
+              const SizedBox(height: 25),
               Image.asset('asset/images/logo.png', width: 120, height: 30),
             ],
           ),
@@ -124,6 +184,10 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
                 MaterialPageRoute(builder: (context) => const SettingsPage()),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.visibility_off),
+            onPressed: navigateToHiddenStudents,
           ),
         ],
         backgroundColor: Colors.transparent,
@@ -140,16 +204,16 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
                   children: [
                     Center(
                       child: ListTile(
-                        title: Text(
+                        title: const Text(
                           'Daftar Siswa Kelas',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         subtitle: Text(
-                          '${widget.kelas}',
+                          widget.kelas,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -173,10 +237,10 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
                                   ? Colors.blue
                                   : Colors.pink;
                           final fotoUrl =
-                              student['foto'] != null &&
-                                      student['foto'].isNotEmpty
+                              (student['foto'] != null &&
+                                      student['foto'].isNotEmpty)
                                   ? student['foto']
-                                  : 'http://192.168.218.89/aplikasi-checkin/uploads/siswa/default.png';
+                                  : 'http://192.168.242.233/aplikasi-checkin/uploads/siswa/default.png';
 
                           return Card(
                             margin: const EdgeInsets.symmetric(
@@ -189,7 +253,7 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
                               ),
                               title: Text(
                                 student['nama_lengkap'],
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 19,
                                 ),
@@ -213,7 +277,6 @@ class _StudentListByClassPageState extends State<StudentListByClassPage> {
                                   ),
                                 ],
                               ),
-                              onTap: () {},
                             ),
                           );
                         },

@@ -30,7 +30,9 @@ class _StudentHomePageState extends State<StudentHomePage> {
 
   Future<void> fetchProfile() async {
     final response = await http.post(
-      Uri.parse('http://192.168.218.89/aplikasi-checkin/get_profile_siswa.php'),
+      Uri.parse(
+        'http://192.168.242.233/aplikasi-checkin/pages/siswa/get_profile_siswa.php',
+      ),
       body: {'email': widget.email},
     );
 

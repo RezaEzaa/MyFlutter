@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:checkin/Pages/settings_page.dart';
 import 'package:checkin/Pages/welcome_page.dart';
@@ -27,7 +28,9 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.218.89/aplikasi-checkin/login_siswa.php'),
+        Uri.parse(
+          'http://192.168.242.233/aplikasi-checkin/pages/siswa/login_siswa.php',
+        ),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "email": emailController.text,
@@ -35,13 +38,27 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
         }),
       );
 
-      final responseData = jsonDecode(response.body);
+      print("Response status: ${response.statusCode}");
+      print("Response body: ${response.body}");
+
+      dynamic responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        _showErrorDialog(
+          "Gagal mengurai respon dari server:\n${response.body}",
+        );
+        return;
+      }
 
       if (response.statusCode == 200 &&
           responseData['message'] == 'Login berhasil') {
         _showSuccessToast('Login berhasil!');
 
         String userEmail = emailController.text;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('siswa_email', userEmail);
 
         Navigator.pushReplacement(
           context,
@@ -134,6 +151,8 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
               const SizedBox(height: 10),
               TextField(
                 controller: emailController,
+                keyboardType: TextInputType.emailAddress, // <-- ini penting
+                textCapitalization: TextCapitalization.none,
                 decoration: const InputDecoration(
                   labelText: 'Alamat E-Mail Yang Terdaftar',
                   border: OutlineInputBorder(),
@@ -143,6 +162,8 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
               TextField(
                 controller: passwordController,
                 obscureText: true,
+                textCapitalization:
+                    TextCapitalization.none, // <-- ini juga penting
                 decoration: const InputDecoration(
                   labelText: 'Kata Sandi',
                   border: OutlineInputBorder(),

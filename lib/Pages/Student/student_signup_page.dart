@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:checkin/Pages/settings_page.dart';
 import 'package:checkin/Pages/Student/student_login_page.dart';
@@ -86,6 +87,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
     }
 
     if (selectedImage == null) {
+      Image.file(selectedImage!, height: 100);
       _showErrorDialog('Registrasi Gagal', 'Upload foto dulu');
       return;
     }
@@ -95,9 +97,12 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
     });
 
     try {
+      // 1. Upload ke server PHP
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.218.89/aplikasi-checkin/register_siswa.php'),
+        Uri.parse(
+          'http://192.168.242.233/aplikasi-checkin/pages/siswa/register_siswa.php',
+        ),
       );
 
       request.fields['nama_lengkap'] = namaController.text;
@@ -117,11 +122,58 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
 
       if (response.statusCode == 200 &&
           responseData['message'] == 'Registrasi siswa berhasil') {
-        _showSuccessToast('Registrasi berhasil! Silakan login');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const StudentLoginPage()),
+        // 2. Ambil ID siswa berdasarkan email
+        var getIdResponse = await http.post(
+          Uri.parse(
+            'http://192.168.242.233/aplikasi-checkin/pages/siswa/get_siswa_by_email.php',
+          ),
+          body: {'email': emailController.text},
         );
+
+        var getIdData = jsonDecode(getIdResponse.body);
+        if (getIdResponse.statusCode == 200 &&
+            getIdData['status'] == 'success') {
+          String siswaId = getIdData['data']['id'];
+
+          // 3. Kirim ke FaceNet
+          var facenetRequest = http.MultipartRequest(
+            'POST',
+            Uri.parse('http://192.168.242.233:5000/api/upload_dataset'),
+          );
+
+          facenetRequest.fields['id'] = siswaId;
+          facenetRequest.fields['nama_lengkap'] = namaController.text;
+          facenetRequest.fields['kelas'] = kelasController.text;
+          facenetRequest.files.add(
+            await http.MultipartFile.fromPath('foto', selectedImage!.path),
+          );
+
+          var facenetResponse = await facenetRequest.send();
+          var facenetResponseBody =
+              await facenetResponse.stream.bytesToString();
+          var faceNetResponseData = jsonDecode(facenetResponseBody);
+
+          if (facenetResponse.statusCode == 200 &&
+              faceNetResponseData['status'] == 'success') {
+            _showSuccessToast('Registrasi berhasil! Silakan login');
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('siswa_email', emailController.text);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const StudentLoginPage()),
+            );
+          } else {
+            _showErrorDialog(
+              'Gagal Kirim ke FaceNet',
+              faceNetResponseData['message'] ?? 'Gagal tidak diketahui',
+            );
+          }
+        } else {
+          _showErrorDialog(
+            'Gagal Ambil ID',
+            getIdData['message'] ?? 'Email tidak ditemukan',
+          );
+        }
       } else {
         _showErrorDialog('Registrasi Gagal', responseData['message']);
       }
@@ -167,6 +219,8 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             const SizedBox(height: 10),
             TextField(
               controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              textCapitalization: TextCapitalization.none,
               decoration: const InputDecoration(
                 labelText: 'Alamat E-Mail',
                 border: OutlineInputBorder(),
@@ -175,6 +229,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             const SizedBox(height: 10),
             TextField(
               controller: namaController,
+              textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
                 labelText: 'Nama Lengkap',
                 border: OutlineInputBorder(),
@@ -200,6 +255,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             const SizedBox(height: 10),
             TextField(
               controller: kelasController,
+              textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
                 labelText: 'Kelas',
                 border: OutlineInputBorder(),
@@ -208,6 +264,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             const SizedBox(height: 10),
             TextField(
               controller: namaSekolahController,
+              textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
                 labelText: 'Nama Sekolah',
                 border: OutlineInputBorder(),
@@ -226,6 +283,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             TextField(
               controller: kataSandiController,
               obscureText: true,
+              textCapitalization: TextCapitalization.none,
               decoration: const InputDecoration(
                 labelText: 'Kata Sandi',
                 border: OutlineInputBorder(),
@@ -235,6 +293,7 @@ class _StudentSignupPageState extends State<StudentSignupPage> {
             TextField(
               controller: konfirmasiKataSandiController,
               obscureText: true,
+              textCapitalization: TextCapitalization.none,
               decoration: const InputDecoration(
                 labelText: 'Konfirmasi Kata Sandi',
                 border: OutlineInputBorder(),

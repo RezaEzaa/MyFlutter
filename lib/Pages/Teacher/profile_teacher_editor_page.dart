@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:checkin/Pages/settings_page.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ProfileTeacherEditorPage extends StatefulWidget {
   final String id;
@@ -35,8 +36,8 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
   late TextEditingController _emailController;
   late TextEditingController _nameController;
   late TextEditingController _genderController;
-  late TextEditingController _subjectController;
   late TextEditingController _schoolController;
+  late List<TextEditingController> mataPelajaranControllers;
 
   File? _newProfileImage;
   late String _photoUrl;
@@ -48,9 +49,16 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
     _emailController = TextEditingController(text: widget.email);
     _nameController = TextEditingController(text: widget.fullName);
     _genderController = TextEditingController(text: widget.gender);
-    _subjectController = TextEditingController(text: widget.subject);
     _schoolController = TextEditingController(text: widget.school);
     _photoUrl = widget.photoUrl;
+
+    final mataPelajaranList =
+        widget.subject.split(',').map((e) => e.trim()).toList();
+    mataPelajaranControllers =
+        mataPelajaranList.map((e) => TextEditingController(text: e)).toList();
+    if (mataPelajaranControllers.isEmpty) {
+      mataPelajaranControllers.add(TextEditingController());
+    }
   }
 
   Future<void> _pickImage() async {
@@ -67,21 +75,27 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
     if (_nameController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty ||
         _genderController.text.trim().isEmpty ||
-        _subjectController.text.trim().isEmpty ||
+        mataPelajaranControllers.any(
+          (controller) => controller.text.trim().isEmpty,
+        ) ||
         _schoolController.text.trim().isEmpty) {
       return "Semua kolom wajib diisi";
     }
 
     var request = http.MultipartRequest(
       'POST',
-      Uri.parse('http://192.168.218.89/aplikasi-checkin/edit_profile_guru.php'),
+      Uri.parse(
+        'http://192.168.242.233/aplikasi-checkin/pages/guru/edit_profile_guru.php',
+      ),
     );
 
     request.fields['id'] = widget.id;
     request.fields['nama_lengkap'] = _nameController.text.trim();
     request.fields['email'] = _emailController.text.trim();
     request.fields['jenis_kelamin'] = _genderController.text.trim();
-    request.fields['mata_pelajaran'] = _subjectController.text.trim();
+    request.fields['mata_pelajaran'] = mataPelajaranControllers
+        .map((controller) => controller.text.trim())
+        .join(',');
     request.fields['nama_sekolah'] = _schoolController.text.trim();
 
     if (_newProfileImage != null) {
@@ -106,6 +120,20 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
       debugPrint('Error: $e');
       return "Terjadi kesalahan: $e";
     }
+  }
+
+  void _addMataPelajaranField() {
+    setState(() {
+      mataPelajaranControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeMataPelajaranField(int index) {
+    setState(() {
+      if (mataPelajaranControllers.length > 1) {
+        mataPelajaranControllers.removeAt(index);
+      }
+    });
   }
 
   @override
@@ -155,7 +183,7 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
             _buildTextField(_emailController, 'Alamat E-Mail'),
             _buildTextField(_nameController, 'Nama Lengkap'),
             _buildGenderDropdown(),
-            _buildTextField(_subjectController, 'Mata Pelajaran'),
+            _buildSubjectFields(),
             _buildTextField(_schoolController, 'Nama Sekolah'),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -163,11 +191,10 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
                 String result = await _saveProfile();
                 if (!mounted) return;
                 if (result == "success") {
+                  _showSuccessToast("Profil berhasil diperbarui");
                   Navigator.pop(context);
                 } else {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(result)));
+                  _showErrorDialog(result);
                 }
               },
               child: const Text('Simpan'),
@@ -179,10 +206,23 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
   }
 
   Widget _buildTextField(TextEditingController controller, String label) {
+    TextCapitalization capitalization = TextCapitalization.none;
+    TextInputType keyboardType = TextInputType.text;
+
+    if (label == 'Nama Lengkap') {
+      capitalization = TextCapitalization.words;
+    } else if (label == 'Nama Sekolah') {
+      capitalization = TextCapitalization.characters;
+    } else if (label.contains('E-Mail')) {
+      keyboardType = TextInputType.emailAddress;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
         controller: controller,
+        textCapitalization: capitalization,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -212,6 +252,73 @@ class _ProfileTeacherEditorPageState extends State<ProfileTeacherEditorPage> {
           border: OutlineInputBorder(),
         ),
       ),
+    );
+  }
+
+  Widget _buildSubjectFields() {
+    return Column(
+      children: [
+        ...mataPelajaranControllers.asMap().entries.map((entry) {
+          int idx = entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: entry.value,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Mata Pelajaran ${idx + 1}',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                if (mataPelajaranControllers.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle, color: Colors.red),
+                    onPressed: () => _removeMataPelajaranField(idx),
+                  ),
+              ],
+            ),
+          );
+        }),
+        TextButton(
+          onPressed: _addMataPelajaranField,
+          child: const Text('Tambahkan Kolom Mata Pelajaran'),
+        ),
+      ],
+    );
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

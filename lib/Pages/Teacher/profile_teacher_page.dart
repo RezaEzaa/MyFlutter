@@ -4,6 +4,7 @@ import 'package:checkin/Pages/Teacher/password_teacher_editor_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ProfileTeacherPage extends StatefulWidget {
   final String email;
@@ -37,7 +38,9 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
 
   Future<void> fetchProfile() async {
     final response = await http.post(
-      Uri.parse('http://192.168.218.89/aplikasi-checkin/get_profile_guru.php'),
+      Uri.parse(
+        'http://192.168.242.233/aplikasi-checkin/pages/guru/get_profile_guru.php',
+      ),
       body: {'email': widget.email},
     );
 
@@ -94,7 +97,7 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
 
     final response = await http.post(
       Uri.parse(
-        'http://192.168.218.89/aplikasi-checkin/delete_account_guru.php',
+        'http://192.168.242.233/aplikasi-checkin/pages/guru/delete_account_guru.php',
       ),
       body: {'email': widget.email},
     );
@@ -103,12 +106,42 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
     if (result['status'] == 'success') {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
+      _showSuccessToast('Akun berhasil dihapus');
       Navigator.pushReplacementNamed(context, '/homepage');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus akun: ${result['message']}')),
-      );
+      _showErrorDialog('Gagal menghapus akun: ${result['message']}');
     }
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -170,7 +203,10 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
                                   'Jenis Kelamin',
                                   gender == 'L' ? 'Laki-Laki' : 'Perempuan',
                                 ),
-                                _buildProfileInfo('Mata Pelajaran', subject),
+                                _buildProfileInfoList(
+                                  'Mata Pelajaran',
+                                  subject,
+                                ),
                                 _buildProfileInfo('Sekolah', school),
                               ],
                             ),
@@ -222,8 +258,8 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.lock),
-                                color: Colors.blue,
+                                icon: const Icon(Icons.key),
+                                color: Colors.orangeAccent,
                                 iconSize: 30,
                               ),
                             ),
@@ -256,6 +292,30 @@ class _ProfileTeacherPageState extends State<ProfileTeacherPage> {
         children: [
           Text("$title: ", style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileInfoList(String title, String value) {
+    final items =
+        value
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("$title: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: items.map((e) => Text(e)).toList(),
+            ),
+          ),
         ],
       ),
     );

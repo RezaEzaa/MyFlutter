@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'package:checkin/Pages/settings_page.dart';
 
@@ -29,12 +30,12 @@ class _PasswordTeacherEditorPageState extends State<PasswordTeacherEditorPage> {
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      _showSnackbar('Semua field harus diisi.');
+      _showErrorDialog('Semua field harus diisi.');
       return;
     }
 
     if (newPassword != confirmPassword) {
-      _showSnackbar('Password baru dan konfirmasi tidak sama.');
+      _showErrorDialog('Password baru dan konfirmasi tidak sama.');
       return;
     }
 
@@ -43,7 +44,7 @@ class _PasswordTeacherEditorPageState extends State<PasswordTeacherEditorPage> {
     try {
       final response = await http.post(
         Uri.parse(
-          'http://192.168.218.89/aplikasi-checkin/update_password_guru.php',
+          'http://192.168.242.233/aplikasi-checkin/pages/guru/update_password_guru.php',
         ),
         body: {
           'email': widget.email,
@@ -56,26 +57,57 @@ class _PasswordTeacherEditorPageState extends State<PasswordTeacherEditorPage> {
         try {
           final result = json.decode(response.body);
           if (result['status'] == 'success') {
-            _showSnackbar('Password berhasil diperbarui.');
+            _showSuccessToast('Password berhasil diperbarui.');
             Navigator.pop(context);
           } else {
-            _showSnackbar(result['message'] ?? 'Gagal memperbarui password.');
+            _showErrorDialog(
+              result['message'] ?? 'Gagal memperbarui password.',
+            );
           }
         } catch (e) {
-          _showSnackbar('Respons bukan JSON yang valid: ${response.body}');
+          _showErrorDialog('Respons bukan JSON yang valid: ${response.body}');
         }
       } else {
-        _showSnackbar('Terjadi kesalahan pada server: ${response.statusCode}');
+        _showErrorDialog(
+          'Terjadi kesalahan pada server: ${response.statusCode}',
+        );
       }
     } catch (e) {
-      _showSnackbar('Terjadi kesalahan: $e');
+      _showErrorDialog('Terjadi kesalahan: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  void _showSnackbar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -142,6 +174,7 @@ class _PasswordTeacherEditorPageState extends State<PasswordTeacherEditorPage> {
       child: TextField(
         controller: controller,
         obscureText: obscure,
+        textCapitalization: TextCapitalization.none, // <-- tambahkan ini
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),

@@ -4,6 +4,7 @@ import 'package:checkin/Pages/Student/password_student_editor_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ProfileStudentPage extends StatefulWidget {
   final String email;
@@ -37,7 +38,9 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
 
   Future<void> fetchProfile() async {
     final response = await http.post(
-      Uri.parse('http://192.168.218.89/aplikasi-checkin/get_profile_siswa.php'),
+      Uri.parse(
+        'http://192.168.242.233/aplikasi-checkin/pages/siswa/get_profile_siswa.php',
+      ),
       body: {'email': widget.email},
     );
 
@@ -90,7 +93,7 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
 
     final response = await http.post(
       Uri.parse(
-        'http://192.168.218.89/aplikasi-checkin/delete_account_siswa.php',
+        'http://192.168.242.233/aplikasi-checkin/pages/siswa/delete_account_siswa.php',
       ),
       body: {'email': widget.email},
     );
@@ -99,12 +102,42 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
     if (result['status'] == 'success') {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
+      _showSuccessToast('Akun berhasil dihapus');
       Navigator.pushReplacementNamed(context, '/homepage');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus akun: ${result['message']}')),
-      );
+      _showErrorDialog('Gagal menghapus akun: ${result['message']}');
     }
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -218,8 +251,8 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.lock),
-                                color: Colors.blue,
+                                icon: const Icon(Icons.key),
+                                color: Colors.orangeAccent,
                                 iconSize: 30,
                               ),
                             ),

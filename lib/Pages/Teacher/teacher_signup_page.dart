@@ -20,7 +20,6 @@ class TeacherSignupPage extends StatefulWidget {
 class _TeacherSignupPageState extends State<TeacherSignupPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController namaController = TextEditingController();
-  final TextEditingController mataPelajaranController = TextEditingController();
   final TextEditingController kataSandiController = TextEditingController();
   final TextEditingController konfirmasiKataSandiController =
       TextEditingController();
@@ -32,6 +31,10 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
 
   bool isLoading = false;
 
+  List<TextEditingController> mataPelajaranControllers = [
+    TextEditingController(),
+  ];
+
   Future<void> pickImage() async {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -39,6 +42,20 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
         selectedImage = File(pickedFile.path);
       });
     }
+  }
+
+  void _addMataPelajaranField() {
+    setState(() {
+      mataPelajaranControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeMataPelajaranField(int index) {
+    setState(() {
+      if (mataPelajaranControllers.length > 1) {
+        mataPelajaranControllers.removeAt(index);
+      }
+    });
   }
 
   void _showSuccessToast(String message) {
@@ -98,18 +115,25 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.218.89/aplikasi-checkin/register_guru.php'),
+        Uri.parse(
+          'http://192.168.242.233/aplikasi-checkin/pages/guru/register_guru.php',
+        ),
       );
 
       request.fields['nama_lengkap'] = namaController.text;
       request.fields['email'] = emailController.text;
       request.fields['jenis_kelamin'] = selectedGender!;
-      request.fields['mata_pelajaran'] = mataPelajaranController.text;
       request.fields['nama_sekolah'] = namaSekolahController.text;
       request.fields['kata_sandi'] = kataSandiController.text;
       request.files.add(
         await http.MultipartFile.fromPath('foto', selectedImage!.path),
       );
+
+      for (int i = 0; i < mataPelajaranControllers.length; i++) {
+        request.fields['mata_pelajaran'] = mataPelajaranControllers
+            .map((c) => c.text)
+            .join(',');
+      }
 
       var response = await request.send();
       var responseBody = await response.stream.bytesToString();
@@ -119,7 +143,12 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
           responseData['message'] == 'Registrasi guru berhasil') {
         final prefs = await SharedPreferences.getInstance();
         prefs.setString('guru_email', emailController.text);
-        prefs.setString('mata_pelajaran', mataPelajaranController.text);
+        prefs.setString(
+          'mata_pelajaran',
+          mataPelajaranControllers
+              .map((controller) => controller.text)
+              .join(','),
+        );
 
         _showSuccessToast('Registrasi berhasil! Silakan login');
         Navigator.pushReplacement(
@@ -172,7 +201,9 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
               const SizedBox(height: 10),
               TextField(
                 controller: emailController,
-                decoration: const InputDecoration(
+                keyboardType: TextInputType.emailAddress,
+                textCapitalization: TextCapitalization.none,
+                decoration: InputDecoration(
                   labelText: 'Alamat E-Mail',
                   border: OutlineInputBorder(),
                 ),
@@ -180,7 +211,8 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
               const SizedBox(height: 10),
               TextField(
                 controller: namaController,
-                decoration: const InputDecoration(
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
                   labelText: 'Nama Lengkap',
                   border: OutlineInputBorder(),
                 ),
@@ -203,17 +235,47 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              TextField(
-                controller: mataPelajaranController,
-                decoration: const InputDecoration(
-                  labelText: 'Mata Pelajaran',
-                  border: OutlineInputBorder(),
-                ),
+              Column(
+                children: [
+                  ...mataPelajaranControllers.asMap().entries.map((entry) {
+                    int idx = entry.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: entry.value,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                labelText: 'Mata Pelajaran ${idx + 1}',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          if (mataPelajaranControllers.length > 1)
+                            IconButton(
+                              icon: Icon(
+                                Icons.remove_circle,
+                                color: Colors.red,
+                              ),
+                              onPressed: () => _removeMataPelajaranField(idx),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                  TextButton(
+                    onPressed: _addMataPelajaranField,
+                    child: const Text('Tambahkan Kolom Mata Pelajaran'),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: namaSekolahController,
-                decoration: const InputDecoration(
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
                   labelText: 'Nama Sekolah',
                   border: OutlineInputBorder(),
                 ),
@@ -231,6 +293,7 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
               TextField(
                 controller: kataSandiController,
                 obscureText: true,
+                textCapitalization: TextCapitalization.none,
                 decoration: const InputDecoration(
                   labelText: 'Kata Sandi',
                   border: OutlineInputBorder(),
@@ -240,6 +303,7 @@ class _TeacherSignupPageState extends State<TeacherSignupPage> {
               TextField(
                 controller: konfirmasiKataSandiController,
                 obscureText: true,
+                textCapitalization: TextCapitalization.none,
                 decoration: const InputDecoration(
                   labelText: 'Konfirmasi Kata Sandi',
                   border: OutlineInputBorder(),

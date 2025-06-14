@@ -162,9 +162,9 @@ class HomePage extends StatelessWidget {
 
                     const SizedBox(height: 50),
 
-                    // Tombol Tentang Aplikasi (dengan ikon lebih kecil dan teks di sampingnya)
-                    GestureDetector(
-                      onTap: () {
+                    // Tombol Tentang Aplikasi (ikon dan teks menyatu dalam TextButton)
+                    TextButton(
+                      onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -172,20 +172,30 @@ class HomePage extends StatelessWidget {
                           ),
                         );
                       },
+                      style: ButtonStyle(
+                        overlayColor: WidgetStateProperty.all(
+                          Colors.transparent,
+                        ),
+                        splashFactory:
+                            NoSplash.splashFactory, // Hilangkan efek sentuhan
+                      ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.info_outline,
-                            size: 15, // Ikon lebih kecil
+                            size: 15,
+                            color: isDarkMode ? Colors.white : Colors.black,
                           ),
                           const SizedBox(width: 5),
-                          const Text(
+                          Text(
                             'Tentang Aplikasi',
                             style: TextStyle(
                               fontFamily: 'TitilliumWeb',
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ],

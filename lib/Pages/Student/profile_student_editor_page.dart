@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:checkin/Pages/settings_page.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ProfileStudentEditorPage extends StatefulWidget {
   final String id;
@@ -73,7 +74,7 @@ class _ProfileStudentEditorPageState extends State<ProfileStudentEditorPage> {
     var request = http.MultipartRequest(
       'POST',
       Uri.parse(
-        'http://192.168.218.89/aplikasi-checkin/edit_profile_siswa.php',
+        'http://192.168.242.233/aplikasi-checkin/pages/siswa/edit_profile_siswa.php',
       ),
     );
 
@@ -160,11 +161,10 @@ class _ProfileStudentEditorPageState extends State<ProfileStudentEditorPage> {
                 String result = await _saveProfile();
                 if (!mounted) return;
                 if (result == "success") {
+                  _showSuccessToast("Profil berhasil diperbarui");
                   Navigator.pop(context);
                 } else {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(result)));
+                  _showErrorDialog(result);
                 }
               },
               child: const Text('Simpan'),
@@ -176,10 +176,23 @@ class _ProfileStudentEditorPageState extends State<ProfileStudentEditorPage> {
   }
 
   Widget _buildTextField(TextEditingController controller, String label) {
+    TextCapitalization capitalization = TextCapitalization.none;
+    TextInputType keyboardType = TextInputType.text;
+
+    if (label == 'Nama Lengkap') {
+      capitalization = TextCapitalization.words;
+    } else if (label == 'Nama Sekolah' || label == 'Kelas') {
+      capitalization = TextCapitalization.characters;
+    } else if (label.contains('E-Mail')) {
+      keyboardType = TextInputType.emailAddress;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
         controller: controller,
+        textCapitalization: capitalization,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -209,6 +222,37 @@ class _ProfileStudentEditorPageState extends State<ProfileStudentEditorPage> {
           border: OutlineInputBorder(),
         ),
       ),
+    );
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Terjadi Kesalahan'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

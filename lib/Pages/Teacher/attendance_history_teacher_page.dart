@@ -29,41 +29,48 @@ class _AttendanceHistoryTeacherPageState
 
   Future<void> loadGuruDataAndFetchPresensi() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      guruEmail = prefs.getString('guru_email');
-      mataPelajaran = prefs.getString('mata_pelajaran');
-    });
+    guruEmail = prefs.getString('guru_email');
+    mataPelajaran = prefs.getString('mata_pelajaran');
 
     if (guruEmail != null) {
       await fetchPresensiData();
       await fetchSelectedClasses();
+    } else {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   Future<void> fetchPresensiData() async {
+    setState(() {
+      isLoading = true;
+    });
     try {
       final response = await http.get(
         Uri.parse(
-          'http://192.168.218.89/aplikasi-checkin/get_presensi_guru.php?guru_email=$guruEmail',
+          'http://192.168.242.233/aplikasi-checkin/pages/guru/get_presensi_guru.php?guru_email=$guruEmail',
         ),
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status'] == true) {
-          setState(() {
-            presensiList = data['data'];
-          });
+        if (data['status'] == true || data['status'] == 'success') {
+          presensiList = data['data'];
         } else {
           presensiList = [];
+          _showErrorDialog('Tidak ada data presensi ditemukan.');
         }
+      } else {
+        _showErrorDialog('Gagal mengambil data presensi dari server.');
       }
     } catch (e) {
       debugPrint('Error fetching presensi: $e');
+      _showErrorDialog('Terjadi kesalahan: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted)
+        setState(() {
+          isLoading = false;
+        });
     }
   }
 
@@ -71,17 +78,14 @@ class _AttendanceHistoryTeacherPageState
     try {
       final response = await http.post(
         Uri.parse(
-          'http://192.168.218.89/aplikasi-checkin/get_selected_classes.php',
+          'http://192.168.242.233/aplikasi-checkin/pages/guru/get_selected_classes.php',
         ),
         body: {'guru_email': guruEmail!},
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status']) {
-          setState(() {
-            selectedClasses = List<String>.from(data['kelas']);
-          });
+        if (data['status'] == true || data['status'] == 'success') {
+          selectedClasses = List<String>.from(data['kelas']);
         }
       }
     } catch (e) {
@@ -93,7 +97,7 @@ class _AttendanceHistoryTeacherPageState
     showDialog(
       context: context,
       builder:
-          (context) => SimpleDialog(
+          (_) => SimpleDialog(
             title: const Text("Pilih Kelas untuk Tambah Presensi"),
             children:
                 selectedClasses.map((kelas) {
@@ -110,28 +114,73 @@ class _AttendanceHistoryTeacherPageState
   }
 
   Future<void> navigateToAddAttendance(String kelas) async {
-    if (kelas.isEmpty ||
-        guruEmail == null ||
-        guruEmail!.isEmpty ||
-        mataPelajaran == null ||
-        mataPelajaran!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data guru atau kelas tidak lengkap')),
-      );
+    if (kelas.isEmpty || guruEmail == null || mataPelajaran == null) {
+      _showErrorDialog('Data guru atau kelas tidak lengkap');
       return;
     }
-
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
-            (context) => AddAttendancePage(
-              kelas: kelas,
-              guruEmail: guruEmail!,
-              mataPelajaran: mataPelajaran!,
-            ),
+            (_) => AddAttendancePage(kelasList: [kelas], guruEmail: guruEmail!),
       ),
-    ).then((_) => fetchPresensiData());
+    );
+    await fetchPresensiData();
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Terjadi Kesalahan'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _toggleDetection(
+    String idPresensi,
+    bool currentlyActive,
+    Function(bool) onUpdated,
+  ) async {
+    final url =
+        currentlyActive
+            ? 'http://192.168.242.205/aplikasi-checkin/api/stop_detection.php'
+            : 'http://192.168.242.205/aplikasi-checkin/api/start_detection.php';
+
+    try {
+      final resp = await http.post(
+        Uri.parse(url),
+        body: {'id_presensi_kelas': idPresensi, 'guru_email': guruEmail!},
+      );
+      final data = json.decode(resp.body);
+      if (data['status'] == true) {
+        onUpdated(!currentlyActive);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentlyActive ? 'Presensi dihentikan' : 'Presensi diaktifkan',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? 'Gagal ubah status')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Koneksi gagal: $e')));
+    }
   }
 
   @override
@@ -139,109 +188,115 @@ class _AttendanceHistoryTeacherPageState
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const Center(
-                child: Text(
-                  'Riwayat Presensi',
-                  style: TextStyle(
-                    fontFamily: 'TitilliumWeb',
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+        child:
+            isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : presensiList.isEmpty
+                ? const Center(
+                  child: Text(
+                    'Belum ada data presensi.',
+                    style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              isLoading
-                  ? const CircularProgressIndicator()
-                  : presensiList.isEmpty
-                  ? const Center(
-                    child: Text(
-                      'Belum ada data presensi.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
+                )
+                : ListView.builder(
+                  itemCount: presensiList.length,
+                  itemBuilder: (context, i) {
+                    var p = presensiList[i];
+                    bool aktif = p['status'] == 'aktif';
+                    bool selesai = p['status'] == 'selesai';
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 5,
                       ),
-                    ),
-                  )
-                  : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: presensiList.length,
-                    itemBuilder: (context, index) {
-                      final presensi = presensiList[index];
-                      return GestureDetector(
+                      child: ListTile(
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder:
-                                  (context) => AttendanceDetailPageTeacher(
-                                    kelas: presensi['kelas'],
-                                    mataPelajaran: presensi['mata_pelajaran'],
+                                  (_) => AttendanceDetailPageTeacher(
+                                    kelas: p['kelas'],
+                                    mataPelajaran: p['mata_pelajaran'],
                                     idPresensiKelas:
-                                        int.tryParse(
-                                          presensi['id_presensi_kelas']
-                                              .toString(),
-                                        ) ??
-                                        0,
+                                        int.tryParse(p['id'].toString()) ?? 0,
                                   ),
                             ),
                           );
                         },
-                        child: Container(
-                          padding: const EdgeInsets.all(16.0),
-                          margin: const EdgeInsets.only(bottom: 10.0),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[850],
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Kelas: ${presensi['kelas']}',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                'Mata Pelajaran: ${presensi['mata_pelajaran']}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'Tanggal: ${presensi['tanggal'] ?? 'Belum presensi'}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
+                        title: Text(
+                          'Kelas: ${p['kelas']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
                           ),
                         ),
-                      );
-                    },
-                  ),
-            ],
-          ),
-        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Mata Pelajaran: ${p['mata_pelajaran']}'),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tanggal: ${p['tanggal'] ?? 'Belum presensi'}',
+                            ),
+                          ],
+                        ),
+                        trailing: SizedBox(
+                          width: 95,
+                          height: 28,
+                          child: ElevatedButton(
+                            onPressed:
+                                selesai
+                                    ? null
+                                    : () {
+                                      _toggleDetection(
+                                        p['id'].toString(),
+                                        aktif,
+                                        (newState) {
+                                          setState(() {
+                                            presensiList[i]['status'] =
+                                                newState ? 'aktif' : 'selesai';
+                                          });
+                                        },
+                                      );
+                                    },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  selesai
+                                      ? Colors.green
+                                      : aktif
+                                      ? Colors.red
+                                      : Colors.lightBlueAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              selesai
+                                  ? 'SELESAI'
+                                  : aktif
+                                  ? 'HENTIKAN'
+                                  : 'PRESENSI',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(right: 16.0, bottom: 12.0),
-        child: FloatingActionButton(
-          onPressed: selectedClasses.isEmpty ? null : showClassSelectionDialog,
-          child: const Icon(Icons.add),
-          tooltip: 'Buat Presensi Baru',
-          shape: const CircleBorder(),
-          backgroundColor: selectedClasses.isEmpty ? Colors.grey : Colors.blue,
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: selectedClasses.isEmpty ? null : showClassSelectionDialog,
+        backgroundColor: selectedClasses.isEmpty ? Colors.grey : Colors.blue,
+        tooltip: 'Buat Presensi Baru',
+        child: const Icon(Icons.add),
       ),
     );
   }
