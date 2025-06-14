@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:checkin/main.dart';
 import 'package:checkin/Pages/Teacher/attendance_detail_page_teacher.dart';
 import 'package:checkin/Pages/Teacher/add_attendance_page.dart';
 
@@ -14,7 +15,8 @@ class AttendanceHistoryTeacherPage extends StatefulWidget {
 }
 
 class _AttendanceHistoryTeacherPageState
-    extends State<AttendanceHistoryTeacherPage> {
+    extends State<AttendanceHistoryTeacherPage>
+    with RouteAware {
   List<dynamic> presensiList = [];
   List<String> selectedClasses = [];
   bool isLoading = true;
@@ -34,11 +36,16 @@ class _AttendanceHistoryTeacherPageState
 
     if (guruEmail != null) {
       await fetchPresensiData();
-      await fetchSelectedClasses();
+      await fetchSelectedClasses(); // diikuti setState
+      if (mounted) {
+        setState(() {}); // penting agar tombol FAB diperbarui
+      }
     } else {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -86,10 +93,13 @@ class _AttendanceHistoryTeacherPageState
         final data = json.decode(response.body);
         if (data['status'] == true || data['status'] == 'success') {
           selectedClasses = List<String>.from(data['kelas']);
+        } else {
+          selectedClasses = [];
         }
       }
     } catch (e) {
       debugPrint('Gagal mengambil kelas: $e');
+      selectedClasses = [];
     }
   }
 
@@ -125,7 +135,31 @@ class _AttendanceHistoryTeacherPageState
             (_) => AddAttendancePage(kelasList: [kelas], guruEmail: guruEmail!),
       ),
     );
+    // Reload class list and presensi list
+    await fetchSelectedClasses();
     await fetchPresensiData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Dipanggil saat kembali ke halaman ini
+    fetchSelectedClasses(); // reload data kelas
+    fetchPresensiData(); // reload data presensi juga jika perlu
   }
 
   void _showErrorDialog(String message) {

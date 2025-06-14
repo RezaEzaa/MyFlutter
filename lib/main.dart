@@ -17,6 +17,8 @@ void main() async {
   runApp(const MyApp());
 }
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 class ThemeProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
 
@@ -77,6 +79,7 @@ class MyApp extends StatelessWidget {
                   (context) =>
                       const RegistrationPage(), // Tambahkan file RegisterPage
             },
+            navigatorObservers: [routeObserver],
           );
         },
       ),
