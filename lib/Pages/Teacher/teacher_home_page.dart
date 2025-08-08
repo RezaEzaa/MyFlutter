@@ -6,25 +6,21 @@ import 'package:checkin/Pages/Teacher/profile_teacher_page.dart';
 import 'package:checkin/Pages/Teacher/attendance_history_teacher_page.dart';
 import 'package:checkin/Pages/Teacher/recap_attendance_page.dart';
 import 'package:checkin/Pages/Teacher/student_detail_page.dart';
-import 'package:checkin/Pages/Teacher/attendance_system_page.dart';
 import 'package:checkin/Pages/settings_page.dart';
 
 class TeacherHomePage extends StatefulWidget {
   final String email;
   const TeacherHomePage({super.key, required this.email});
-
   @override
   _TeacherHomePageState createState() => _TeacherHomePageState();
 }
 
 class _TeacherHomePageState extends State<TeacherHomePage> {
   int _selectedIndex = 0;
-  bool _isFirstVisitTeacher = true;
-  int? _activeLabelIndexTeacher;
-
-  Map<String, dynamic>? _profileData;
+  bool _isFirstVisit = true;
+  int? _activeLabelIndex;
   bool _isLoading = true;
-
+  Map<String, dynamic>? _profileData;
   @override
   void initState() {
     super.initState();
@@ -34,24 +30,16 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   Future<void> fetchProfile() async {
     final response = await http.post(
       Uri.parse(
-        'http://192.168.242.233/aplikasi-checkin/pages/guru/get_profile_guru.php',
+        'http://10.167.91.233/aplikasi-checkin/pages/guru/get_profile_guru.php',
       ),
       body: {'email': widget.email},
     );
-
-    print('Response body: ${response.body}');
-
     if (response.statusCode == 200) {
       try {
         final result = json.decode(response.body);
         if (result['status'] == 'success') {
-          final String baseUrl =
-              'http://192.168.242.233/aplikasi-checkin/uploads/guru/';
           setState(() {
             _profileData = result['data'];
-            if (_profileData!['foto'] != null && _profileData!['foto'] != '') {
-              _profileData!['foto'] = baseUrl + _profileData!['foto'];
-            }
             _isLoading = false;
           });
         } else {
@@ -61,9 +49,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
         showError('Format JSON tidak valid: $e');
       }
     } else {
-      showError(
-        'Gagal terhubung ke server. Status code: ${response.statusCode}',
-      );
+      showError('Gagal terhubung ke server. Status: ${response.statusCode}');
     }
   }
 
@@ -87,8 +73,8 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      _isFirstVisitTeacher = false;
-      _activeLabelIndexTeacher = index;
+      _isFirstVisit = false;
+      _activeLabelIndex = index;
     });
   }
 
@@ -97,7 +83,6 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     final List<Widget> _pages = [
       ProfileTeacherPage(
         email: _profileData?['email'] ?? '',
@@ -106,9 +91,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       const AttendanceHistoryTeacherPage(),
       const AttendanceRecapPage(),
       StudentDetailPage(),
-      const AttendanceSystemPage(),
     ];
-
     return WillPopScope(
       onWillPop: () async => await _showExitDialog(context),
       child: Scaffold(
@@ -118,7 +101,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
             const SizedBox(height: 20),
             Expanded(
               child:
-                  _isFirstVisitTeacher
+                  _isFirstVisit
                       ? _buildWelcomeMessage()
                       : _pages[_selectedIndex],
             ),
@@ -136,7 +119,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(height: 25, child: Container()),
+            const SizedBox(height: 25),
             Image.asset('asset/images/logo.png', width: 120, height: 30),
           ],
         ),
@@ -147,7 +130,9 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const SettingsPage()),
+              MaterialPageRoute(
+                builder: (context) => const SettingsPage(userRole: 'guru'),
+              ),
             );
           },
         ),
@@ -158,22 +143,40 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   }
 
   Widget _buildWelcomeMessage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Dashboard Aplikasi Check In Guru',
-            style: TextStyle(fontFamily: 'LilitaOne', fontSize: 20),
-            textAlign: TextAlign.center,
+    return Center(
+      child: Card(
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(
+                Icons.dashboard_customize,
+                size: 48,
+                color: Colors.deepPurple,
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Dashboard Guru Aplikasi Check-In',
+                style: TextStyle(
+                  fontFamily: 'LilitaOne',
+                  fontSize: 22,
+                  letterSpacing: 1.2,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Selamat datang! Jangan lupa tersenyum :)',
+                style: TextStyle(fontFamily: 'TitilliumWeb', fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          SizedBox(height: 10),
-          Text(
-            'Jangan Lupa Untuk Tersenyum :)',
-            style: TextStyle(fontFamily: 'TitilliumWeb', fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -182,31 +185,20 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        buildIconButton(Icons.person_outlined, Icons.person, 'Profil Akun', 0),
+        buildIconButton(Icons.person_outline, Icons.person, 'Profil', 0),
         buildIconButton(
           Icons.view_timeline_outlined,
           Icons.view_timeline,
-          'Riwayat Presensi',
+          'Riwayat',
           1,
         ),
         buildIconButton(
-          Icons.receipt_outlined,
-          Icons.receipt,
-          'Input Data Siswa',
+          Icons.drive_file_move_outline,
+          Icons.drive_file_move,
+          'Manage Data',
           2,
         ),
-        buildIconButton(
-          Icons.view_list_outlined,
-          Icons.view_list,
-          'Daftar Siswa',
-          3,
-        ),
-        buildIconButton(
-          Icons.camera_outlined,
-          Icons.camera,
-          'Sistem Presensi',
-          4,
-        ),
+        buildIconButton(Icons.view_list_outlined, Icons.view_list, 'Siswa', 3),
       ],
     );
   }
@@ -217,7 +209,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     String label,
     int index,
   ) {
-    bool isActive = _activeLabelIndexTeacher == index;
+    bool isActive = _activeLabelIndex == index;
     return GestureDetector(
       onTap: () => _onItemTapped(index),
       child: Column(
@@ -244,9 +236,7 @@ Future<bool> _showExitDialog(BuildContext context) async {
         builder:
             (context) => AlertDialog(
               title: const Text('Konfirmasi'),
-              content: const Text(
-                'Apakah Anda yakin ingin keluar dari aplikasi?',
-              ),
+              content: const Text('Yakin ingin keluar dari aplikasi?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),

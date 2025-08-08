@@ -2,23 +2,24 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:checkin/Pages/Student/profile_student_page.dart';
-import 'package:checkin/Pages/Student/attendance_history_student_page.dart';
+import 'package:checkin/Pages/Admin/admin_profile_page.dart';
+import 'package:checkin/Pages/Admin/admin_data_input_page.dart';
+import 'package:checkin/Pages/Admin/admin_data_view_page.dart';
 import 'package:checkin/Pages/settings_page.dart';
 
-class StudentHomePage extends StatefulWidget {
+class AdminHomePage extends StatefulWidget {
   final String email;
-  const StudentHomePage({super.key, required this.email});
+  const AdminHomePage({super.key, required this.email});
   @override
-  _StudentHomePageState createState() => _StudentHomePageState();
+  _AdminHomePageState createState() => _AdminHomePageState();
 }
 
-class _StudentHomePageState extends State<StudentHomePage> {
+class _AdminHomePageState extends State<AdminHomePage> {
   int _selectedIndex = 0;
   bool _isFirstVisit = true;
   int? _activeLabelIndex;
-  bool _isLoading = true;
   Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
   @override
   void initState() {
     super.initState();
@@ -28,7 +29,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
   Future<void> fetchProfile() async {
     final response = await http.post(
       Uri.parse(
-        'http://10.167.91.233/aplikasi-checkin/pages/siswa/get_profile_siswa.php',
+        'http://10.167.91.233/aplikasi-checkin/pages/admin/get_profile_admin.php',
       ),
       body: {'email': widget.email},
     );
@@ -36,8 +37,13 @@ class _StudentHomePageState extends State<StudentHomePage> {
       try {
         final result = json.decode(response.body);
         if (result['status'] == 'success') {
+          final String baseUrl =
+              'http://10.167.91.233/aplikasi-checkin/uploads/admin/';
           setState(() {
             _profileData = result['data'];
+            if (_profileData!['foto'] != null && _profileData!['foto'] != '') {
+              _profileData!['foto'] = baseUrl + _profileData!['foto'];
+            }
             _isLoading = false;
           });
         } else {
@@ -82,11 +88,12 @@ class _StudentHomePageState extends State<StudentHomePage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final List<Widget> _pages = [
-      ProfileStudentPage(
+      ProfileAdminPage(
         email: _profileData?['email'] ?? '',
         onProfileUpdated: fetchProfile,
       ),
-      const AttendanceHistoryStudentPage(),
+      const AdminDataInputPage(),
+      const AdminDataViewPage(),
     ];
     return WillPopScope(
       onWillPop: () async => await _showExitDialog(context),
@@ -127,7 +134,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const SettingsPage(userRole: 'siswa'),
+                builder: (context) => const SettingsPage(userRole: 'admin'),
               ),
             );
           },
@@ -148,11 +155,15 @@ class _StudentHomePageState extends State<StudentHomePage> {
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.school_outlined, size: 48, color: Colors.green),
-              SizedBox(height: 12),
-              Text(
-                'Dashboard Siswa Aplikasi Check-In',
+            children: [
+              const Icon(
+                Icons.dashboard_customize_rounded,
+                size: 48,
+                color: Colors.indigo,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Dashboard Admin Aplikasi Check-In',
                 style: TextStyle(
                   fontFamily: 'LilitaOne',
                   fontSize: 22,
@@ -160,11 +171,16 @@ class _StudentHomePageState extends State<StudentHomePage> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 10),
-              Text(
-                'Selamat Datang! Jangan lupa tersenyum :)',
-                style: TextStyle(fontFamily: 'TitilliumWeb', fontSize: 16),
-                textAlign: TextAlign.center,
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
+                    'Unggah data guru & siswa lewat Excel',
+                    style: TextStyle(fontFamily: 'TitilliumWeb', fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ],
           ),
@@ -178,7 +194,8 @@ class _StudentHomePageState extends State<StudentHomePage> {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         buildIconButton(Icons.person_outline, Icons.person, 'Profil', 0),
-        buildIconButton(Icons.history_outlined, Icons.history, 'Riwayat', 1),
+        buildIconButton(Icons.folder_outlined, Icons.folder, 'Input', 1),
+        buildIconButton(Icons.view_list_outlined, Icons.view_list, 'Data', 2),
       ],
     );
   }

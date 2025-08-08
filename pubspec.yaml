@@ -41,7 +41,7 @@ dependencies:
   fluttertoast: ^8.2.12
   intl: ^0.20.2
   path_provider: ^2.1.5
-  permission_handler: ^12.0.0+1
+  permission_handler: ^12.0.1
   open_file: ^3.5.10
   file_picker: ^10.1.9
   device_info_plus: ^11.4.0
@@ -49,6 +49,8 @@ dependencies:
   mime: ^2.0.0
   flutter_file_dialog: ^3.0.2
   path: ^1.9.1
+  flutter_local_notifications: ^19.3.0
+  dio: ^5.8.0+1
 
 dev_dependencies:
   flutter_test:

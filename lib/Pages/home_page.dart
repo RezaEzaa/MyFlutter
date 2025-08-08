@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:checkin/Pages/settings_page.dart';
 import 'package:checkin/Pages/login_page.dart';
 import 'package:checkin/Pages/registration_page.dart';
-import 'package:checkin/Pages/information_app_page.dart';
-
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       body: Stack(
         children: [
-          // Background
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
@@ -27,20 +22,18 @@ class HomePage extends StatelessWidget {
               ),
             ),
           ),
-
-          // Konten Utama
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Column(
                   children: [
-                    // AppBar Custom
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         IconButton(
                           icon: const Icon(Icons.settings),
+                          tooltip: 'Pengaturan Tema',
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -52,17 +45,13 @@ class HomePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 40),
-
-                    // Logo
+                    const SizedBox(height: 70),
                     Image.asset(
                       'asset/images/logo.png',
                       width: 200,
                       height: 120,
                     ),
-                    const SizedBox(height: 60),
-
-                    // Welcome Text
+                    const SizedBox(height: 50),
                     const Text(
                       'SELAMAT DATANG DI APLIKASI',
                       style: TextStyle(
@@ -77,130 +66,108 @@ class HomePage extends StatelessWidget {
                       'CHECK IN',
                       style: TextStyle(
                         fontFamily: 'LilitaOne',
-                        fontSize: 30,
+                        fontSize: 34,
                         letterSpacing: 1.5,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 50),
-
-                    // Tombol Log In dengan Tooltip
                     Tooltip(
                       message: 'Masuk ke aplikasi',
-                      child: IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginPage(),
+                      child: SizedBox(
+                        width: 220,
+                        height: 45,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.login, size: 20),
+                          label: const Text(
+                            'Masuk',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            elevation: 6,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.login,
-                          color: Colors.blue,
-                          size: 35,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 0),
+                    const SizedBox(height: 8),
                     const Text(
-                      'Jika Anda sudah memiliki akun, silakan tekan ikon di atas untuk masuk.',
+                      'Untuk guru dan siswa yang sudah memiliki akun dari admin.',
+                      style: TextStyle(
+                        fontFamily: 'TitilliumWeb',
+                        fontSize: 11,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const Text(
+                      '(Tekan lama ikon untuk info tombol)',
                       style: TextStyle(
                         fontFamily: 'TitilliumWeb',
                         fontSize: 10,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const Text(
-                      '(Tekan lama ikon untuk informasi tombol)',
-                      style: TextStyle(
-                        fontFamily: 'TitilliumWeb',
-                        fontSize: 10,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Tombol Sign Up dengan Tooltip
+                    const SizedBox(height: 20),
                     Tooltip(
-                      message: 'Daftar untuk membuat akun',
-                      child: IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const RegistrationPage(),
+                      message: 'Daftar khusus untuk admin',
+                      child: SizedBox(
+                        width: 220,
+                        height: 45,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RegistrationPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.app_registration, size: 20),
+                          label: const Text(
+                            'Daftar',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            elevation: 6,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.app_registration,
-                          color: Colors.green,
-                          size: 35,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 0),
+                    const SizedBox(height: 8),
                     const Text(
-                      'Jika Anda belum memiliki akun, silakan tekan ikon di atas untuk registrasi.',
+                      'Khusus untuk admin sistem. Guru dan siswa mendapat akun dari admin.',
+                      style: TextStyle(
+                        fontFamily: 'TitilliumWeb',
+                        fontSize: 11,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const Text(
+                      '(Tekan lama ikon untuk info tombol)',
                       style: TextStyle(
                         fontFamily: 'TitilliumWeb',
                         fontSize: 10,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const Text(
-                      '(Tekan lama ikon untuk informasi tombol)',
-                      style: TextStyle(
-                        fontFamily: 'TitilliumWeb',
-                        fontSize: 10,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 50),
-
-                    // Tombol Tentang Aplikasi (ikon dan teks menyatu dalam TextButton)
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const InformationAppsPage(),
-                          ),
-                        );
-                      },
-                      style: ButtonStyle(
-                        overlayColor: WidgetStateProperty.all(
-                          Colors.transparent,
-                        ),
-                        splashFactory:
-                            NoSplash.splashFactory, // Hilangkan efek sentuhan
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 15,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Tentang Aplikasi',
-                            style: TextStyle(
-                              fontFamily: 'TitilliumWeb',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:checkin/Pages/home_page.dart';
-import 'package:checkin/Pages/login_page.dart'; // Tambahkan jika perlu
-import 'package:checkin/Pages/registration_page.dart'; // Tambahkan jika perlu
-
+import 'package:checkin/Pages/login_page.dart';
+import 'package:checkin/Pages/registration_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([
@@ -16,18 +15,13 @@ void main() async {
   ]);
   runApp(const MyApp());
 }
-
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
-
 class ThemeProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
-
   ThemeMode get themeMode => _themeMode;
-
   ThemeProvider() {
     _loadTheme();
   }
-
   void _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     final theme = prefs.getString('theme') ?? 'system';
@@ -39,7 +33,6 @@ class ThemeProvider with ChangeNotifier {
             : ThemeMode.system;
     notifyListeners();
   }
-
   void setTheme(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -54,10 +47,8 @@ class ThemeProvider with ChangeNotifier {
     notifyListeners();
   }
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -70,14 +61,14 @@ class MyApp extends StatelessWidget {
             darkTheme: ThemeData.dark(),
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
-            initialRoute: '/homepage', // bisa diganti tergantung logika login
+            initialRoute: '/homepage',
             routes: {
               '/homepage': (context) => const HomePage(),
               '/login':
-                  (context) => const LoginPage(), // Tambahkan file LoginPage
+                  (context) => const LoginPage(),
               '/register':
                   (context) =>
-                      const RegistrationPage(), // Tambahkan file RegisterPage
+                      const RegistrationPage(),
             },
             navigatorObservers: [routeObserver],
           );

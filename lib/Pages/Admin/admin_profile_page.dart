@@ -1,46 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:checkin/Pages/Admin/admin_profile_editor_page.dart';
+import 'package:checkin/Pages/Admin/admin_password_editor_page.dart';
 import 'package:checkin/Pages/shared/school_info_page.dart';
-import 'package:checkin/Pages/shared/admin_creator_info_page.dart';
 
-class ProfileStudentPage extends StatefulWidget {
+class ProfileAdminPage extends StatefulWidget {
   final String email;
   final VoidCallback onProfileUpdated;
-  const ProfileStudentPage({
+  const ProfileAdminPage({
     super.key,
     required this.email,
     required this.onProfileUpdated,
   });
   @override
-  State<ProfileStudentPage> createState() => _ProfileStudentPageState();
+  State<ProfileAdminPage> createState() => _ProfileAdminPageState();
 }
 
-class _ProfileStudentPageState extends State<ProfileStudentPage> {
+class _ProfileAdminPageState extends State<ProfileAdminPage> {
   late String id = '';
   late String fullName = '';
   late String gender = '';
-  late String email = '';
-  late String className = '';
-  late String prodi = '';
+  late String school = '';
+  late String position = '';
   late String photoUrl = '';
-  late String noAbsen = '';
   bool isLoading = true;
   bool hasSchoolData = false;
-  bool hasAdminCreatorInfo = false;
   @override
   void initState() {
     super.initState();
     fetchProfile();
     checkSchoolData();
-    checkAdminCreatorInfo();
   }
 
   Future<void> fetchProfile() async {
     setState(() => isLoading = true);
     final response = await http.post(
       Uri.parse(
-        'http://10.167.91.233/aplikasi-checkin/pages/siswa/get_profile_siswa.php',
+        'http://10.167.91.233/aplikasi-checkin/pages/admin/get_profile_admin.php',
       ),
       body: {'email': widget.email},
     );
@@ -52,12 +51,9 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
           id = data['id'].toString();
           fullName = data['nama_lengkap'];
           gender = data['jenis_kelamin'];
-          email = data['email'];
-          className = data['kelas'];
-          prodi = data['prodi'] ?? '';
+          school = data['nama_sekolah'];
+          position = data['jabatan'] ?? '';
           photoUrl = data['foto'] ?? '';
-          noAbsen =
-              data['no_absen'] != null ? data['no_absen'].toString() : '-';
           isLoading = false;
         });
       } else {
@@ -74,7 +70,7 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
     try {
       final response = await http.get(
         Uri.parse(
-          'http://10.167.91.233/aplikasi-checkin/pages/siswa/get_sekolah_info.php',
+          'http://10.167.91.233/aplikasi-checkin/pages/admin/get_sekolah_info.php',
         ),
       );
       if (response.statusCode == 200) {
@@ -88,45 +84,96 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
     }
   }
 
-  Future<void> checkAdminCreatorInfo() async {
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'http://10.167.91.233/aplikasi-checkin/pages/siswa/get_admin_creator.php',
-        ),
-        body: {'email': widget.email},
-      );
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          hasAdminCreatorInfo = data['has_admin_info'] ?? false;
-        });
-      }
-    } catch (e) {
-      print('Error checking admin creator info: $e');
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Konfirmasi'),
+            content: const Text('Apakah kamu yakin ingin menghapus akun ini?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Hapus'),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
+    final response = await http.post(
+      Uri.parse(
+        'http://10.167.91.233/aplikasi-checkin/pages/admin/delete_account_admin.php',
+      ),
+      body: {'email': widget.email},
+    );
+    final result = json.decode(response.body);
+    if (result['status'] == 'success') {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      _showSuccessToast('Akun berhasil dihapus');
+      Navigator.pushReplacementNamed(context, '/homepage');
+    } else {
+      _showErrorDialog('Gagal menghapus akun: ${result['message']}');
     }
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.grey,
+      fontSize: 16.0,
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (BuildContext context) => AlertDialog(
+            title: const Text('Terjadi Kesalahan'),
+            content: Text(message),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+    );
   }
 
   Widget _buildProfileInfo(String title, String value) {
     IconData icon;
     Color color;
     if (title == 'Jenis Kelamin') {
-      icon = gender == 'L' ? Icons.male : Icons.female;
-      color = gender == 'L' ? Colors.blue : Colors.pink;
-    } else if (title == 'Kelas') {
-      icon = Icons.class_;
-      color = Colors.deepPurple;
-    } else if (title == 'Program Studi') {
+      if (gender == 'L') {
+        icon = Icons.male;
+        color = Colors.blue;
+      } else if (gender == 'P') {
+        icon = Icons.female;
+        color = Colors.pink;
+      } else {
+        icon = Icons.person;
+        color = Colors.grey;
+      }
+    } else if (title == 'Jabatan') {
       icon = Icons.badge;
       color = Colors.teal;
+    } else if (title == 'Sekolah') {
+      icon = Icons.school;
+      color = Colors.green;
     } else if (title == 'Email') {
       icon = Icons.email;
       color = Colors.deepOrange;
-    } else if (title == 'No. Absen') {
-      icon = Icons.format_list_numbered;
-      color = Colors.amber;
     } else {
-      icon = Icons.info_outline;
+      icon = Icons.info;
       color = Colors.grey;
     }
     return Padding(
@@ -165,6 +212,32 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
     );
   }
 
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: label,
+      child: ElevatedButton.icon(
+        icon: Icon(icon, size: 20),
+        label: Text(label),
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color.withOpacity(0.9),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+          elevation: 4,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -184,7 +257,7 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
                         children: [
                           const SizedBox(height: 10),
                           Hero(
-                            tag: 'student-avatar',
+                            tag: 'admin-avatar',
                             child: CircleAvatar(
                               radius: 60,
                               backgroundColor: Colors.blue.shade100,
@@ -232,18 +305,16 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 children: [
-                                  _buildProfileInfo('No. Absen', noAbsen),
-                                  const Divider(),
-                                  _buildProfileInfo('Email', email),
+                                  _buildProfileInfo('Email', widget.email),
                                   const Divider(),
                                   _buildProfileInfo(
                                     'Jenis Kelamin',
                                     gender == 'L' ? 'Laki-Laki' : 'Perempuan',
                                   ),
                                   const Divider(),
-                                  _buildProfileInfo('Kelas', className),
+                                  _buildProfileInfo('Jabatan', position),
                                   const Divider(),
-                                  _buildProfileInfo('Program Studi', prodi),
+                                  _buildProfileInfo('Sekolah', school),
                                   if (hasSchoolData) ...[
                                     const Divider(),
                                     Padding(
@@ -257,7 +328,7 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
                                             MaterialPageRoute(
                                               builder:
                                                   (_) => const SchoolInfoPage(
-                                                    userRole: 'siswa',
+                                                    userRole: 'admin',
                                                   ),
                                             ),
                                           );
@@ -324,92 +395,62 @@ class _ProfileStudentPageState extends State<ProfileStudentPage> {
                                       ),
                                     ),
                                   ],
-                                  if (hasAdminCreatorInfo) ...[
-                                    const Divider(),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8.0,
-                                      ),
-                                      child: InkWell(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) => AdminCreatorInfoPage(
-                                                    userEmail: widget.email,
-                                                    userRole: 'siswa',
-                                                  ),
-                                            ),
-                                          );
-                                        },
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.indigo.withOpacity(
-                                              0.1,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.indigo.withOpacity(
-                                                0.3,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: Colors.indigo
-                                                    .withOpacity(0.2),
-                                                child: const Icon(
-                                                  Icons.admin_panel_settings,
-                                                  size: 18,
-                                                  color: Colors.indigo,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Admin Pembuat Akun',
-                                                      style: TextStyle(
-                                                        fontSize: 14,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: Colors.indigo,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      'Lihat informasi admin yang membuat akun Anda',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.grey,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const Icon(
-                                                Icons.arrow_forward_ios,
-                                                size: 16,
-                                                color: Colors.indigo,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildActionButton(
+                                icon: Icons.edit,
+                                label: 'Edit',
+                                color: Colors.green,
+                                onPressed: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => ProfileAdminEditorPage(
+                                            id: id,
+                                            fullName: fullName,
+                                            gender: gender,
+                                            email: widget.email,
+                                            position: position,
+                                            school: school,
+                                            photoUrl: photoUrl,
+                                          ),
+                                    ),
+                                  );
+                                  fetchProfile();
+                                },
+                              ),
+                              const SizedBox(width: 16),
+                              _buildActionButton(
+                                icon: Icons.key,
+                                label: 'Kata Sandi',
+                                color: Colors.orange,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => PasswordAdminEditorPage(
+                                            email: widget.email,
+                                          ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 16),
+                              _buildActionButton(
+                                icon: Icons.delete_forever,
+                                label: 'Hapus',
+                                color: Colors.red,
+                                onPressed: _deleteAccount,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 30),
                         ],

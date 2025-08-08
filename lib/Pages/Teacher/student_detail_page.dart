@@ -3,21 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:checkin/Pages/Teacher/student_list_by_class_page.dart';
-import 'package:checkin/Pages/Teacher/class_list_page.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 class StudentDetailPage extends StatefulWidget {
   const StudentDetailPage({super.key});
-
   @override
   State<StudentDetailPage> createState() => _StudentDetailPageState();
 }
 
 class _StudentDetailPageState extends State<StudentDetailPage> {
-  List<String> selectedClasses = [];
+  Map<String, List<String>> prodiKelasMap = {};
+  Set<String> expandedProdi = {};
   String? guruEmail;
-  bool isLoading = false; // ✅ Tambahkan variabel isLoading
-
+  bool isLoading = false;
   @override
   void initState() {
     super.initState();
@@ -28,256 +25,222 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     final prefs = await SharedPreferences.getInstance();
     guruEmail = prefs.getString('guru_email');
     if (guruEmail != null && guruEmail!.isNotEmpty) {
-      await getSelectedClassesFromServer();
+      await fetchKelasProdi();
     }
   }
 
-  Future<void> getSelectedClassesFromServer() async {
-    setState(() {
-      isLoading = true;
-    });
-
+  Future<void> fetchKelasProdi() async {
+    setState(() => isLoading = true);
     try {
       final response = await http.post(
         Uri.parse(
-          'http://192.168.242.233/aplikasi-checkin/pages/guru/get_selected_classes.php',
+          'http://10.167.91.233/aplikasi-checkin/pages/guru/get_classes_detail.php',
         ),
         body: {'guru_email': guruEmail!},
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status']) {
+          final List kelasProdiList = data['data'];
+          final Map<String, List<String>> map = {};
+          for (var item in kelasProdiList) {
+            final String prodi = item['prodi'] ?? '';
+            final List<String> kelasList = List<String>.from(
+              item['kelas_list'] ?? [],
+            );
+            map[prodi] = kelasList;
+          }
           setState(() {
-            selectedClasses = List<String>.from(data['kelas']);
+            prodiKelasMap = map;
           });
+        } else {
+          _showErrorDialog(data['message'] ?? 'Gagal memuat data');
         }
+      } else {
+        _showErrorDialog(
+          'Gagal koneksi ke server (Status ${response.statusCode})',
+        );
       }
     } catch (e) {
-      debugPrint('Gagal mengambil kelas: $e');
+      debugPrint('Gagal mengambil kelas & prodi: $e');
+      _showErrorDialog("Terjadi kesalahan saat mengambil data");
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
-  void addClass(String kelas) {
-    if (!selectedClasses.contains(kelas)) {
-      setState(() => selectedClasses.add(kelas));
-      saveSelectedClassToServer(kelas);
-    }
-  }
-
-  Future<void> saveSelectedClassToServer(String kelas) async {
-    if (guruEmail == null || guruEmail!.isEmpty) return;
-
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'http://192.168.242.233/aplikasi-checkin/pages/guru/add_selected_class.php',
-        ),
-        body: {'guru_email': guruEmail!, 'kelas': kelas},
-      );
-
-      final data = json.decode(response.body);
-      if (data['status'] != true) {
-        _showErrorDialog(data['message'] ?? 'Gagal menyimpan kelas');
-      } else {
-        _showSuccessToast('Kelas berhasil ditambahkan');
-      }
-    } catch (_) {
-      _showErrorDialog("Terjadi kesalahan koneksi ke server");
-    }
-  }
-
-  Future<void> deleteSelectedClass(String kelas) async {
-    if (guruEmail == null || guruEmail!.isEmpty) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: const Text('Konfirmasi'),
-            content: Text('Hapus kelas "$kelas"?'),
-            actions: [
-              TextButton(
-                child: const Text('Batal'),
-                onPressed: () => Navigator.pop(context, false),
-              ),
-              TextButton(
-                child: const Text('Hapus'),
-                onPressed: () => Navigator.pop(context, true),
-              ),
-            ],
-          ),
+  void _navigateToStudentList(String kelas, String prodi) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentListByClassPage(kelas: kelas, prodi: prodi),
+      ),
     );
-
-    if (confirm != true) return;
-
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'http://192.168.242.233/aplikasi-checkin/pages/guru/delete_selected_class.php',
-        ),
-        body: {'guru_email': guruEmail!, 'kelas': kelas},
-      );
-
-      final data = json.decode(response.body);
-      if (data['status']) {
-        setState(() {
-          selectedClasses.remove(kelas);
-        });
-        _showSuccessToast(data['message']);
-      } else {
-        _showErrorDialog(data['message']);
-      }
-    } catch (_) {
-      _showErrorDialog("Gagal menghapus kelas");
-    }
   }
 
-  void _showSuccessToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.grey,
-      fontSize: 16.0,
-    );
+  void _toggleExpandProdi(String prodi) {
+    setState(() {
+      if (expandedProdi.contains(prodi)) {
+        expandedProdi.remove(prodi);
+      } else {
+        expandedProdi.add(prodi);
+      }
+    });
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Terjadi Kesalahan'),
-          content: Text(message),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('OK'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Terjadi Kesalahan'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
     );
-  }
-
-  void openClassListPage() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (_) => ClassListPage(
-              selectedClasses: List<String>.from(selectedClasses),
-            ),
-      ),
-    );
-
-    if (result != null) {
-      if (result == 'refresh') {
-        await getSelectedClassesFromServer();
-      } else if (result is String) {
-        addClass(result);
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const Center(
-                child: Text(
-                  'Daftar Kelas',
-                  style: TextStyle(
-                    fontFamily: 'TitilliumWeb',
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.people_alt_rounded,
+                    color: Colors.green,
+                    size: 40,
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : selectedClasses.isEmpty
-                  ? const Center(
-                    child: Text(
-                      'Belum ada daftar kelas yang terpilih.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  )
-                  : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: selectedClasses.length,
-                    itemBuilder: (context, index) {
-                      final kelas = selectedClasses[index];
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => StudentListByClassPage(kelas: kelas),
-                            ),
-                          );
-                        },
-                        child: Card(
-                          margin: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 5,
-                          ),
-                          child: ListTile(
-                            title: Text(
-                              kelas,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => deleteSelectedClass(kelas),
-                                ),
-                                const Icon(Icons.arrow_forward_ios),
-                              ],
-                            ),
-                            // onTap dihapus dari ListTile
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Data Siswa',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  prodiKelasMap.isEmpty
+                      ? const Expanded(
+                        child: Center(
+                          child: Text(
+                            'Belum ada data kelas dan prodi',
+                            style: TextStyle(fontSize: 16),
                           ),
                         ),
-                      );
-                    },
-                  ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openClassListPage,
-        child: const Icon(Icons.add),
-        tooltip: 'Tambah Kelas',
-        backgroundColor: Colors.blue,
-        shape: const CircleBorder(),
-      ),
+                      )
+                      : Expanded(
+                        child: RefreshIndicator(
+                          onRefresh: fetchKelasProdi,
+                          child: ListView.builder(
+                            itemCount: prodiKelasMap.length,
+                            padding: const EdgeInsets.only(top: 10),
+                            itemBuilder: (context, index) {
+                              final entry = prodiKelasMap.entries.elementAt(
+                                index,
+                              );
+                              final String prodi = entry.key;
+                              final List<String> kelasList = entry.value;
+                              return Card(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 4,
+                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                child: Column(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => _toggleExpandProdi(prodi),
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: ListTile(
+                                        leading: Icon(
+                                          prodi.isNotEmpty
+                                              ? Icons.school
+                                              : Icons.group,
+                                          color: Colors.green,
+                                        ),
+                                        title: Text(
+                                          prodi.isNotEmpty ? prodi : 'Umum',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        trailing: Icon(
+                                          expandedProdi.contains(prodi)
+                                              ? Icons.expand_less
+                                              : Icons.expand_more,
+                                        ),
+                                      ),
+                                    ),
+                                    if (expandedProdi.contains(prodi))
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 5,
+                                        ),
+                                        child: Column(
+                                          children:
+                                              kelasList.map((kelas) {
+                                                return Card(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                  elevation: 2,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 4,
+                                                      ),
+                                                  child: InkWell(
+                                                    onTap:
+                                                        () =>
+                                                            _navigateToStudentList(
+                                                              kelas,
+                                                              prodi,
+                                                            ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    child: ListTile(
+                                                      leading: const Icon(
+                                                        Icons.class_rounded,
+                                                        color: Colors.teal,
+                                                      ),
+                                                      title: Text(
+                                                        'Kelas: $kelas',
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      trailing: const Icon(
+                                                        Icons.arrow_forward_ios,
+                                                        size: 16,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                ],
+              ),
     );
   }
 }
